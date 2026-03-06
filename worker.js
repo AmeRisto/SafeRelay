@@ -541,8 +541,8 @@ async function setBotCommands() {
   const adminCommands = [
     { command: 'help', description: '显示帮助' },
     { command: 'menu', description: '管理菜单' },
-    { command: 'block', description: '拉黑用户' },
-    { command: 'unblock', description: '解除拉黑' },
+    { command: 'ban', description: '封禁用户' },
+    { command: 'unban', description: '解除封禁' },
     { command: 'clear_ver', description: '清除验证' },
     { command: 'broadcast', description: '广播消息' },
     { command: 'bcancel', description: '取消广播' },
@@ -1326,32 +1326,28 @@ async function handleAdminMessage(message) {
     });
   }
 
-  // 指令：/block (需回复用户消息)
-  if (text === '/block') {
-    if (reply && (reply.forward_from || reply.forward_sender_name)) {
-      const guestChatId = await KV.get('msg-map-' + reply.message_id);
-      if (guestChatId) {
-        await KV.put('blocked-' + guestChatId, 'true'); // 永久拉黑
-        memDelete('blocked-' + guestChatId); // 清除缓存
-        await removeVerifiedUser(guestChatId); // 从已验证列表移除
-        return sendMessage({ chat_id: ADMIN_UID, text: `🚫 用户 ${guestChatId} 已被拉黑。` });
-      } else {
-        return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 无法获取用户ID，可能是旧消息。' });
-      }
+  // 指令：/ban [ID] (支持回复或手输)
+  if (text === '/ban' || text.startsWith('/ban ')) {
+    const targetId = await getTargetId(message, '/ban');
+    if (targetId) {
+      await KV.put('blocked-' + targetId, 'true'); // 永久拉黑
+      memDelete('blocked-' + targetId); // 清除缓存
+      await removeVerifiedUser(targetId); // 从已验证列表移除
+      return sendMessage({ chat_id: ADMIN_UID, text: `🚫 用户 ${targetId} 已被封禁。` });
     } else {
-      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 请回复一条用户转发的消息来拉黑。' });
+      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 格式错误。\n请回复用户消息发送 /ban\n或发送 /ban 123456 (必须是数字 ID)' });
     }
   }
 
-  // 指令：/unblock [ID] (支持回复或手输)
-  if (text.startsWith('/unblock')) {
-    const targetId = await getTargetId(message, '/unblock');
+  // 指令：/unban [ID] (支持回复或手输)
+  if (text === '/unban' || text.startsWith('/unban ')) {
+    const targetId = await getTargetId(message, '/unban');
     if (targetId) {
       await KV.delete('blocked-' + targetId);
       memDelete('blocked-' + targetId); // 清除缓存
       return sendMessage({ chat_id: ADMIN_UID, text: `✅ 用户 ${targetId} 已解封。` });
     } else {
-      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 格式错误。\n请回复用户消息发送 /unblock\n或发送 /unblock 123456 (必须是数字 ID)' });
+      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 格式错误。\n请回复用户消息发送 /unban\n或发送 /unban 123456 (必须是数字 ID)' });
     }
   }
 
@@ -1958,13 +1954,22 @@ async function handleVerifyCallback(request) {
       });
 
       // 通知管理员有新用户验证
-      await sendMessage({
+      let usernameLine = '';
+      if (userInfo && userInfo.username) {
+        usernameLine = `\n📎 @${escapeHtml(userInfo.username)}`;
+      }
+      await requestTelegram('sendMessage', {
         chat_id: ADMIN_UID,
         text: `✅ <b>新用户验证通过</b>
 
-UID: <code>${uid}</code>(${escapeHtml(displayName)})
-`,
-        parse_mode: 'HTML'
+🆔 <code>${uid}</code> (${escapeHtml(displayName)}${usernameLine})`,
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '👤 打开用户资料', url: `tg://user?id=${uid}` }
+          ]]
+        }
       });
 
       return new Response(JSON.stringify({ success: true }), {
