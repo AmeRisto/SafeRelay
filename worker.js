@@ -1,7 +1,7 @@
 /**
  * SafeRelay - Telegram 私聊机器人
  * 项目地址: https://github.com/qianqi32/SafeRelay
- * 版本: 1.0.3
+ * 版本: 1.0.4
  * 当前版本可能仍不稳定，如遇到 BUG 请提交至 issues
 */
 
@@ -543,11 +543,11 @@ async function setBotCommands() {
     { command: 'menu', description: '管理菜单' },
     { command: 'ban', description: '封禁用户' },
     { command: 'unban', description: '解除封禁' },
-    { command: 'clear_ver', description: '清除验证' },
+    { command: 'reset', description: '重置验证' },
     { command: 'broadcast', description: '广播消息' },
     { command: 'bcancel', description: '取消广播' },
     { command: 'addwhite', description: '添加白名单' },
-    { command: 'removewhite', description: '移除白名单' },
+    { command: 'delwhite', description: '删除白名单' },
     { command: 'checkwhite', description: '检查白名单' },
     { command: 'listwhite', description: '白名单列表' },
     { command: 'welcome', description: '欢迎消息' },
@@ -996,13 +996,7 @@ async function generateUsersSubmenu(page = 1) {
 
 <b>用户列表:</b>
 ${userList}
-<b>图例:</b> ✅正常 ⭐白名单 🚫已拉黑
-
-💡 <b>操作提示:</b>
-• 点击用户ID可复制
-• 使用指令管理用户:
-  /block, /unblock, /clear_ver
-  /addwhite, /removewhite`;
+<b>图例:</b> ✅正常 ⭐白名单 🚫已拉黑`;
 
   // 构建分页按钮
   const paginationButtons = [];
@@ -1266,11 +1260,11 @@ async function handleAdminMessage(message) {
             '/broadcast - 广播消息（24h冷却）\n' +
             '/bcancel - 取消广播\n\n' +
             '<b>用户管理（回复消息或指定ID）：</b>\n' +
-            '/block - 拉黑用户\n' +
-            '/unblock - 解封用户\n' +
-            '/clear_ver - 重置验证\n' +
+            '/ban - 封禁用户\n' +
+            '/unban - 解封用户\n' +
+            '/reset - 重置验证\n' +
             '/addwhite - 添加白名单\n' +
-            '/removewhite - 移除白名单\n' +
+            '/delwhite - 删除白名单\n' +
             '/checkwhite - 检查白名单\n' +
             '/listwhite - 白名单列表\n\n' +
             '<b>消息设置：</b>\n' +
@@ -1351,16 +1345,16 @@ async function handleAdminMessage(message) {
     }
   }
 
-  // 指令：/clear_ver [ID] (支持回复或手输)
-  if (text.startsWith('/clear_ver')) {
-    const targetId = await getTargetId(message, '/clear_ver');
+  // 指令：/reset [ID] (支持回复或手输)
+  if (text === '/reset' || text.startsWith('/reset ')) {
+    const targetId = await getTargetId(message, '/reset');
     if (targetId) {
       // 检查用户是否在白名单中
       const isWhite = await isWhitelisted(targetId);
       if (isWhite) {
         return sendMessage({ 
           chat_id: ADMIN_UID, 
-          text: `⚠️ 用户 ${targetId} 在白名单中，无需验证即可发送消息。\n\n如需限制该用户，请先使用 /removewhite ${targetId} 移除白名单。` 
+          text: `⚠️ 用户 ${targetId} 在白名单中，无需验证即可发送消息。\n\n如需限制该用户，请先使用 /delwhite ${targetId} 删除白名单。` 
         });
       }
       
@@ -1369,7 +1363,7 @@ async function handleAdminMessage(message) {
       await removeVerifiedUser(targetId); // 从已验证列表移除
       return sendMessage({ chat_id: ADMIN_UID, text: `🔄 用户 ${targetId} 验证状态已重置。` });
     } else {
-      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 格式错误。\n请回复用户消息发送 /clear_ver\n或发送 /clear_ver 123456 (必须是数字 ID)' });
+      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 格式错误。\n请回复用户消息发送 /reset\n或发送 /reset 123456 (必须是数字 ID)' });
     }
   }
 
@@ -1436,14 +1430,14 @@ async function handleAdminMessage(message) {
     }
   }
 
-  // 指令：/removewhite [ID] - 移除白名单
-  if (text.startsWith('/removewhite')) {
-    const targetId = await getTargetId(message, '/removewhite');
+  // 指令：/delwhite [ID] - 删除白名单
+  if (text === '/delwhite' || text.startsWith('/delwhite ')) {
+    const targetId = await getTargetId(message, '/delwhite');
     if (targetId) {
       await removeFromWhitelist(targetId);
-      return sendMessage({ chat_id: ADMIN_UID, text: `✅ 用户 ${targetId} 已从白名单移除。` });
+      return sendMessage({ chat_id: ADMIN_UID, text: `✅ 用户 ${targetId} 已从白名单删除。` });
     } else {
-      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 格式错误。\n请回复用户消息发送 /removewhite\n或发送 /removewhite 123456 (必须是数字 ID)' });
+      return sendMessage({ chat_id: ADMIN_UID, text: '⚠️ 格式错误。\n请回复用户消息发送 /delwhite\n或发送 /delwhite 123456 (必须是数字 ID)' });
     }
   }
 
